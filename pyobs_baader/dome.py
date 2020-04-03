@@ -47,7 +47,8 @@ class BaaderDome(PyObsModule, IDome):
         Raises:
             ValueError if dome cannot be opened.
         """
-        self._send_command('d#opeshut')
+        with self._command_lock:
+            self._next_command = 'd#opeshut'
 
     def park(self, *args, **kwargs):
         """Close dome.
@@ -55,7 +56,8 @@ class BaaderDome(PyObsModule, IDome):
         Raises:
             ValueError if dome cannot be opened.
         """
-        self._send_command('d#closhut')
+        with self._command_lock:
+            self._next_command = 'd#closhut'
 
     def _communication(self):
         """Thread method for communicating with the dome."""
