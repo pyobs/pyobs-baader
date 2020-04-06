@@ -1,11 +1,11 @@
+import math
 import threading
 import serial
 
-from pyobs.interfaces import IDome
-from pyobs import PyObsModule
+from pyobs.modules.roof import BaseDome
 
 
-class BaaderDome(PyObsModule, IDome):
+class BaaderDome(BaseDome):
     """A pyobs module for a Baader dome."""
 
     def __init__(self, port: str = '/dev/ttyUSB0', baud_rate: int = 9600, byte_size: int = 8, parity: str = 'N',
@@ -20,7 +20,7 @@ class BaaderDome(PyObsModule, IDome):
             stop_bits: Number of stop bits.
             timeout: Connection timeout in seconds.
         """
-        PyObsModule.__init__(self, *args, **kwargs)
+        BaseDome.__init__(self, *args, **kwargs)
 
         # store it
         self._port = port
@@ -59,6 +59,53 @@ class BaaderDome(PyObsModule, IDome):
         with self._command_lock:
             self._next_command = 'd#closhut'
 
+    def move_altaz(self, alt: float, az: float, *args, **kwargs):
+        """Moves to given coordinates.
+
+        Args:
+            alt: Alt in deg to move to.
+            az: Az in deg to move to.
+
+        Raises:
+            ValueError: If device could not move.
+        """
+
+        # Baader measures azimuth as West of South, so we need to convert it
+        azimuth = BaaderDome._adjust_azimuth(az)
+
+        # format command, which is of format 'd#azi0900' with the number in units of 1/10 degree
+        cmd = 'd#azi%04d' % int(math.floor(azimuth * 10))
+
+        # queue it
+        with self._command_lock:
+            self._next_command = cmd
+
+    def get_altaz(self, *args, **kwargs) -> (float, float):
+        """Returns current Alt and Az.
+
+        Returns:
+            Tuple of current Alt and Az in degrees.
+        """
+        return None, self._azimuth
+
+    def stop_motion(self, device: str = None, *args, **kwargs):
+        """Stop the motion.
+
+        Args:
+            device: Name of device to stop, or None for all.
+        """
+
+        # not supported, but don't want to raise an exception
+        pass
+
+    def is_ready(self, *args, **kwargs) -> bool:
+        """Returns the device is "ready", whatever that means for the specific device.
+
+        Returns:
+            Whether device is ready
+        """
+        return True
+
     def _communication(self):
         """Thread method for communicating with the dome."""
 
@@ -96,7 +143,25 @@ class BaaderDome(PyObsModule, IDome):
             self._azimuth = None
         else:
             # response is of form d#azi1800, so take lats four characters, parse to float and divide by 10
-            self._azimuth = float(az_response[5:]) / 10.
+            az = float(az_response[5:]) / 10.
+
+            # Baader measures azimuth as West of South, so we need to convert it
+            self._azimuth = BaaderDome._adjust_azimuth(az)
+
+    @staticmethod
+    def _adjust_azimuth(az: float) -> float:
+        """Baader measures azimuth as West of South, so we need to convert it. This works both ways.
+
+        Args:
+            az: Azimuth.
+
+        Returns:
+            Converted azimuth.
+        """
+        az = 180 - az
+        if az < 0:
+            az += 360
+        return az
 
     def _send_command(self, command: str, attempts: int = 5, wait: int = 5) -> str:
         """Executes command.
