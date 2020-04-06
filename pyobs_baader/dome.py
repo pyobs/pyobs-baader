@@ -168,9 +168,9 @@ class BaaderDome(FollowMixin, BaseDome):
         Returns:
             Converted azimuth.
         """
-        az = 180 - az
-        if az < 0:
-            az += 360
+        az += 180
+        if az >= 360:
+            az -= 360
         return az
 
     def _send_command(self, command: str, attempts: int = 5, wait: int = 5) -> str:
