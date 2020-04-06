@@ -198,7 +198,7 @@ class BaaderDome(FollowMixin, BaseDome):
                 ser.write(bytes(command, 'utf-8'))
 
                 # read reply and decode it
-                reply = ser.read(6).decode('utf-8')
+                reply = ser.read(9).decode('utf-8')
 
         except serial.SerialException:
             # something went wrong
