@@ -2,14 +2,16 @@ import math
 import threading
 import serial
 
+from pyobs.interfaces import IAltAz
+from pyobs.mixins import FollowMixin
 from pyobs.modules.roof import BaseDome
 
 
-class BaaderDome(BaseDome):
+class BaaderDome(FollowMixin, BaseDome):
     """A pyobs module for a Baader dome."""
 
     def __init__(self, port: str = '/dev/ttyUSB0', baud_rate: int = 9600, byte_size: int = 8, parity: str = 'N',
-                 stop_bits: int = 1, timeout: int = 180, *args, **kwargs):
+                 stop_bits: int = 1, timeout: int = 180, follow: str = None, *args, **kwargs):
         """Initializes a new Baader dome.
         
         Args:
@@ -19,6 +21,7 @@ class BaaderDome(BaseDome):
             parity: Parity (Y/N).
             stop_bits: Number of stop bits.
             timeout: Connection timeout in seconds.
+            follow: Name of other device (e.g. telescope) to follow.
         """
         BaseDome.__init__(self, *args, **kwargs)
 
@@ -41,6 +44,9 @@ class BaaderDome(BaseDome):
 
         # start thread
         self._add_thread_func(self._communication)
+
+        # mixins
+        FollowMixin.__init__(self, device=follow, interval=2, tolerance=2, mode=IAltAz)
 
     def init(self, *args, **kwargs):
         """Open dome.
