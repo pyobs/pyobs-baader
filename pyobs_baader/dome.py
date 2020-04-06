@@ -36,6 +36,7 @@ class BaaderDome(BaseDome):
 
         # status
         self._shutter = None
+        self._altitude = None
         self._azimuth = None
 
         # start thread
@@ -70,6 +71,9 @@ class BaaderDome(BaseDome):
             ValueError: If device could not move.
         """
 
+        # store altitude directory
+        self._altitude = alt
+
         # Baader measures azimuth as West of South, so we need to convert it
         azimuth = BaaderDome._adjust_azimuth(az)
 
@@ -86,7 +90,7 @@ class BaaderDome(BaseDome):
         Returns:
             Tuple of current Alt and Az in degrees.
         """
-        return None, self._azimuth
+        return self._altitude, self._azimuth
 
     def stop_motion(self, device: str = None, *args, **kwargs):
         """Stop the motion.
