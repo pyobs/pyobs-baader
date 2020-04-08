@@ -1,10 +1,13 @@
 import math
 import threading
 import serial
+import logging
 
 from pyobs.interfaces import IAltAz
 from pyobs.mixins import FollowMixin
 from pyobs.modules.roof import BaseDome
+
+log = logging.getLogger(__name__)
 
 
 class BaaderDome(FollowMixin, BaseDome):
@@ -46,7 +49,7 @@ class BaaderDome(FollowMixin, BaseDome):
         self._add_thread_func(self._communication)
 
         # mixins
-        FollowMixin.__init__(self, device=follow, interval=2, tolerance=2, mode=IAltAz)
+        FollowMixin.__init__(self, device=follow, interval=10, tolerance=2, mode=IAltAz)
 
     def init(self, *args, **kwargs):
         """Open dome.
@@ -54,6 +57,7 @@ class BaaderDome(FollowMixin, BaseDome):
         Raises:
             ValueError if dome cannot be opened.
         """
+        log.info('Open roof...')
         with self._command_lock:
             self._next_command = 'd#opeshut'
 
@@ -63,6 +67,7 @@ class BaaderDome(FollowMixin, BaseDome):
         Raises:
             ValueError if dome cannot be opened.
         """
+        log.info('Close roof...')
         with self._command_lock:
             self._next_command = 'd#closhut'
 
