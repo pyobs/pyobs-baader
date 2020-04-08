@@ -39,8 +39,8 @@ class BaaderDome(FollowMixin, BaseDome):
 
         # status
         self._shutter = None
-        self._altitude = None
-        self._azimuth = None
+        self._altitude = 0
+        self._azimuth = 0
 
         # start thread
         self._add_thread_func(self._communication)
