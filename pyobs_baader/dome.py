@@ -62,7 +62,7 @@ class BaaderDome(FollowMixin, BaseDome):
         # mixins
         FollowMixin.__init__(self, device=follow, interval=10, tolerance=tolerance, mode=IAltAz)
 
-    @timeout(60000)
+    @timeout(1200000)
     def init(self, *args, **kwargs):
         """Open dome.
 
@@ -93,7 +93,7 @@ class BaaderDome(FollowMixin, BaseDome):
             # set new status
             self._change_motion_status(IMotion.Status.POSITIONED)
 
-    @timeout(60000)
+    @timeout(1200000)
     def park(self, *args, **kwargs):
         """Close dome.
 
@@ -124,7 +124,7 @@ class BaaderDome(FollowMixin, BaseDome):
             # set new status
             self._change_motion_status(IMotion.Status.PARKED)
 
-    @timeout(60000)
+    @timeout(1200000)
     def move_altaz(self, alt: float, az: float, *args, **kwargs):
         """Moves to given coordinates.
 
