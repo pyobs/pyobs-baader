@@ -3,7 +3,9 @@ import threading
 import serial
 import logging
 
-from pyobs.interfaces import IAltAz
+from pyobs.utils.threads import LockWithAbort
+
+from pyobs.interfaces import IAltAz, IMotion
 from pyobs.mixins import FollowMixin
 from pyobs.modules.roof import BaseDome
 
@@ -14,7 +16,7 @@ class BaaderDome(FollowMixin, BaseDome):
     """A pyobs module for a Baader dome."""
 
     def __init__(self, port: str = '/dev/ttyUSB0', baud_rate: int = 9600, byte_size: int = 8, parity: str = 'N',
-                 stop_bits: int = 1, timeout: int = 180, follow: str = None, *args, **kwargs):
+                 stop_bits: int = 1, timeout: int = 180, tolerance: float = 2, follow: str = None, *args, **kwargs):
         """Initializes a new Baader dome.
         
         Args:
@@ -24,6 +26,7 @@ class BaaderDome(FollowMixin, BaseDome):
             parity: Parity (Y/N).
             stop_bits: Number of stop bits.
             timeout: Connection timeout in seconds.
+            tolerance: Tolerance for azimuth.
             follow: Name of other device (e.g. telescope) to follow.
         """
         BaseDome.__init__(self, *args, **kwargs)
@@ -35,11 +38,18 @@ class BaaderDome(FollowMixin, BaseDome):
         self._stop_bits = stop_bits
         self._parity = parity
         self._timeout = timeout
+        self._tolerance = tolerance
 
         # next command
         self._command_lock = threading.RLock()
         self._next_command = None
 
+        # move locks
+        self._lock_shutter = threading.RLock()
+        self._abort_shutter = threading.Event()
+        self._lock_move = threading.RLock()
+        self._abort_move = threading.Event()
+        
         # status
         self._shutter = None
         self._altitude = 0
@@ -49,7 +59,7 @@ class BaaderDome(FollowMixin, BaseDome):
         self._add_thread_func(self._communication)
 
         # mixins
-        FollowMixin.__init__(self, device=follow, interval=10, tolerance=2, mode=IAltAz)
+        FollowMixin.__init__(self, device=follow, interval=10, tolerance=tolerance, mode=IAltAz)
 
     def init(self, *args, **kwargs):
         """Open dome.
@@ -57,19 +67,59 @@ class BaaderDome(FollowMixin, BaseDome):
         Raises:
             ValueError if dome cannot be opened.
         """
-        log.info('Open roof...')
-        with self._command_lock:
-            self._next_command = 'd#opeshut'
 
+        # acquire lock
+        with LockWithAbort(self._lock_shutter, self._abort_shutter):
+            # log
+            log.info('Opening roof...')
+            self._change_motion_status(IMotion.Status.INITIALIZING)
+    
+            # set next command
+            with self._command_lock:
+                self._next_command = 'd#opeshut'
+    
+            # wait for it
+            while self._shutter != 'd#shutope':
+                # abort?
+                if self._abort_shutter.is_set():
+                    log.warning('Opening roof aborted.')
+                    return
+                
+                # wait a little
+                self._abort_shutter.wait(1)
+                
+            # set new status
+            self._change_motion_status(IMotion.Status.POSITIONED)
+                
     def park(self, *args, **kwargs):
         """Close dome.
 
         Raises:
             ValueError if dome cannot be opened.
         """
-        log.info('Close roof...')
-        with self._command_lock:
-            self._next_command = 'd#closhut'
+
+        # acquire lock
+        with LockWithAbort(self._lock_shutter, self._abort_shutter):
+            # log
+            log.info('Closing roof...')
+            self._change_motion_status(IMotion.Status.PARKING)
+
+            # set next command
+            with self._command_lock:
+                self._next_command = 'd#closhut'
+
+            # wait for it
+            while self._shutter != 'd#shutclo':
+                # abort?
+                if self._abort_shutter.is_set():
+                    log.warning('Closing roof aborted.')
+                    return
+
+                # wait a little
+                self._abort_shutter.wait(1)
+
+            # set new status
+            self._change_motion_status(IMotion.Status.PARKED)
 
     def move_altaz(self, alt: float, az: float, *args, **kwargs):
         """Moves to given coordinates.
@@ -82,18 +132,31 @@ class BaaderDome(FollowMixin, BaseDome):
             ValueError: If device could not move.
         """
 
-        # store altitude directory
-        self._altitude = alt
+        # acquire lock
+        with LockWithAbort(self._lock_move, self._abort_move):
+            # store altitude directory
+            self._altitude = alt
+            self._change_motion_status(IMotion.Status.SLEWING)
+    
+            # Baader measures azimuth as West of South, so we need to convert it
+            azimuth = BaaderDome._adjust_azimuth(az)
 
-        # Baader measures azimuth as West of South, so we need to convert it
-        azimuth = BaaderDome._adjust_azimuth(az)
+            # set next command
+            with self._command_lock:
+                # format command, which is of format 'd#azi0900' with the number in units of 1/10 degree
+                self._next_command = 'd#azi%04d' % int(math.floor(azimuth * 10))
 
-        # format command, which is of format 'd#azi0900' with the number in units of 1/10 degree
-        cmd = 'd#azi%04d' % int(math.floor(azimuth * 10))
+            # wait for it
+            while 180 - abs(abs(az - self._azimuth) - 180) > self._tolerance:
+                # abort?
+                if self._abort_shutter.is_set():
+                    return
 
-        # queue it
-        with self._command_lock:
-            self._next_command = cmd
+                # wait a little
+                self._abort_shutter.wait(1)
+
+            # set new status
+            self._change_motion_status(IMotion.Status.POSITIONED)
 
     def get_altaz(self, *args, **kwargs) -> (float, float):
         """Returns current Alt and Az.
@@ -119,7 +182,10 @@ class BaaderDome(FollowMixin, BaseDome):
         Returns:
             Whether device is ready
         """
-        return True
+
+        # check that motion is not in one of the states listed below
+        return self.get_motion_status() not in [IMotion.Status.PARKED, IMotion.Status.INITIALIZING,
+                                                IMotion.Status.PARKING, IMotion.Status.ERROR, IMotion.Status.UNKNOWN]
 
     def _communication(self):
         """Thread method for communicating with the dome."""
@@ -148,6 +214,8 @@ class BaaderDome(FollowMixin, BaseDome):
 
         # get shutter status, might be one of d#shutclo, d#shutrun, or d#shutope
         self._shutter = self._send_command('d#getshut')
+        if self._shutter == 'd#shutclo':
+            self._change_motion_status(IMotion.Status.PARKED)
 
         # get azimuth
         az_response = self._send_command('d#getazim')
