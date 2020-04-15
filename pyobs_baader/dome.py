@@ -237,7 +237,7 @@ class BaaderDome(FollowMixin, BaseDome):
             return
 
         # is this a larger move?
-        large_move = abs(alt - self._altitude) > 2. * self._tolerance
+        large_move = abs(az - self._azimuth) > 2. * self._tolerance
 
         # decide, whether we're tracking or just slewing
         tracking = self.is_following and not large_move
