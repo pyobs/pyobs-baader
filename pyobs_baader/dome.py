@@ -307,7 +307,7 @@ class BaaderDome(FollowMixin, BaseDome):
             az_response = command.wait()
 
             # parse azimuth
-            if not az_response.startswith('d#azi'):
+            if az_response is None or not az_response.startswith('d#azi'):
                 # wrong response!
                 self._azimuth = None
             else:
