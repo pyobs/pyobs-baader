@@ -210,11 +210,11 @@ class BaaderDome(FollowMixin, BaseDome):
         # wait for it
         while 180 - abs(abs(az - self._azimuth) - 180) > self._tolerance:
             # abort?
-            if self._abort_move.is_set():
+            if abort.is_set():
                 return
 
             # wait a little
-            self._abort_move.wait(1)
+            abort.wait(1)
 
     @timeout(1200000)
     def move_altaz(self, alt: float, az: float, *args, **kwargs):
