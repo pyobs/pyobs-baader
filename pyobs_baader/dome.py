@@ -76,7 +76,8 @@ class BaaderDome(FollowMixin, BaseDome):
     """A pyobs module for a Baader dome."""
 
     def __init__(self, port: str = '/dev/ttyUSB0', baud_rate: int = 9600, byte_size: int = 8, parity: str = 'N',
-                 stop_bits: int = 1, timeout: int = 180, tolerance: float = 2, follow: str = None, *args, **kwargs):
+                 stop_bits: int = 1, timeout: int = 180, tolerance: float = 2, park_az: float = 180, follow: str = None,
+                 *args, **kwargs):
         """Initializes a new Baader dome.
         
         Args:
@@ -87,6 +88,7 @@ class BaaderDome(FollowMixin, BaseDome):
             stop_bits: Number of stop bits.
             timeout: Connection timeout in seconds.
             tolerance: Tolerance for azimuth.
+            park_az: Azimuth for park position.
             follow: Name of other device (e.g. telescope) to follow.
         """
         BaseDome.__init__(self, *args, **kwargs)
@@ -99,6 +101,7 @@ class BaaderDome(FollowMixin, BaseDome):
         self._parity = parity
         self._timeout = timeout
         self._tolerance = tolerance
+        self._park_az = park_az
 
         # next command
         self._next_commands = Queue()
@@ -167,12 +170,15 @@ class BaaderDome(FollowMixin, BaseDome):
             log.info('Closing roof...')
             self._change_motion_status(IMotion.Status.PARKING)
 
-            # execute command
+            # send command for closing shutter
             command = self._queue_command(CloseCommand())
             if command.wait() != 'd#gotmess':
                 raise ValueError('Got invalid response from dome.')
 
-            # wait for it
+            # move to park position and wait for it
+            self._move(self._park_az, self._abort_move)
+
+            # finally, wait for shutter to close
             while self._shutter != 'd#shutclo':
                 # abort?
                 if self._abort_shutter.is_set():
@@ -184,6 +190,31 @@ class BaaderDome(FollowMixin, BaseDome):
 
             # set new status
             self._change_motion_status(IMotion.Status.PARKED)
+
+    def _move(self, az: float, abort: threading.Event):
+        """Move the roof and wait for it.
+
+        Args:
+            az: Azimuth to move to.
+            abort: Abort event.
+        """
+
+        # Baader measures azimuth as West of South, so we need to convert it
+        azimuth = BaaderDome._adjust_azimuth(az)
+
+        # execute command
+        command = self._queue_command(SlewCommand(azimuth))
+        if command.wait() != 'd#gotmess':
+            raise ValueError('Got invalid response from dome.')
+
+        # wait for it
+        while 180 - abs(abs(az - self._azimuth) - 180) > self._tolerance:
+            # abort?
+            if self._abort_move.is_set():
+                return
+
+            # wait a little
+            self._abort_move.wait(1)
 
     @timeout(1200000)
     def move_altaz(self, alt: float, az: float, *args, **kwargs):
@@ -211,22 +242,8 @@ class BaaderDome(FollowMixin, BaseDome):
             # change status to TRACKING or SLEWING, depending on whether we're tracking
             self._change_motion_status(IMotion.Status.TRACKING if tracking else IMotion.Status.SLEWING)
     
-            # Baader measures azimuth as West of South, so we need to convert it
-            azimuth = BaaderDome._adjust_azimuth(az)
-
-            # execute command
-            command = self._queue_command(SlewCommand(azimuth))
-            if command.wait() != 'd#gotmess':
-                raise ValueError('Got invalid response from dome.')
-
-            # wait for it
-            while 180 - abs(abs(az - self._azimuth) - 180) > self._tolerance:
-                # abort?
-                if self._abort_move.is_set():
-                    return
-
-                # wait a little
-                self._abort_move.wait(1)
+            # move dome
+            self._move(az, self._abort_move)
 
             # change status to TRACKING or POSITIONED, depending on whether we're tracking
             self._change_motion_status(IMotion.Status.TRACKING if tracking else IMotion.Status.POSITIONED)
