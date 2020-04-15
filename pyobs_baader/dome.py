@@ -258,7 +258,7 @@ class BaaderDome(FollowMixin, BaseDome):
             self._move(az, self._abort_move)
 
             # change status to TRACKING or POSITIONED, depending on whether we're tracking
-            self._change_motion_status(IMotion.Status.TRACKING if tracking else IMotion.Status.POSITIONED)
+            self._change_motion_status(IMotion.Status.TRACKING if self.is_following else IMotion.Status.POSITIONED)
 
     def get_altaz(self, *args, **kwargs) -> (float, float):
         """Returns current Alt and Az.
