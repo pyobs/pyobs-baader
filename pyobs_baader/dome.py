@@ -136,11 +136,19 @@ class BaaderDome(FollowMixin, BaseDome):
             ValueError: If device could not move.
         """
 
+        # is this a larger move?
+        large_move = abs(alt - self._altitude) > 2. * self._tolerance
+
+        # decide, whether we're tracking or just slewing
+        tracking = self.is_following and not large_move
+
         # acquire lock
         with LockWithAbort(self._lock_move, self._abort_move):
-            # store altitude directory
+            # store altitude
             self._altitude = alt
-            self._change_motion_status(IMotion.Status.SLEWING)
+
+            # change status to TRACKING or SLEWING, depending on whether we're tracking
+            self._change_motion_status(IMotion.Status.TRACKING if tracking else IMotion.Status.SLEWING)
     
             # Baader measures azimuth as West of South, so we need to convert it
             azimuth = BaaderDome._adjust_azimuth(az)
@@ -159,8 +167,8 @@ class BaaderDome(FollowMixin, BaseDome):
                 # wait a little
                 self._abort_shutter.wait(1)
 
-            # set new status
-            self._change_motion_status(IMotion.Status.POSITIONED)
+            # change status to TRACKING or POSITIONED, depending on whether we're tracking
+            self._change_motion_status(IMotion.Status.TRACKING if tracking else IMotion.Status.POSITIONED)
 
     def get_altaz(self, *args, **kwargs) -> (float, float):
         """Returns current Alt and Az.
