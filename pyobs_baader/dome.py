@@ -209,6 +209,7 @@ class BaaderDome(FollowMixin, BaseDome):
         azimuth = BaaderDome._adjust_azimuth(az)
 
         # execute command
+        log.info('Moving dome to az=%.2f°.', az)
         command = self._queue_command(SlewCommand(azimuth))
         if command.wait() != 'd#gotmess':
             raise ValueError('Got invalid response from dome.')
