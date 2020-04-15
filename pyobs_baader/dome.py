@@ -176,6 +176,7 @@ class BaaderDome(FollowMixin, BaseDome):
                 raise ValueError('Got invalid response from dome.')
 
             # move to park position and wait for it
+            log.info('Moving to park position...')
             self._move(self._park_az, self._abort_move)
 
             # finally, wait for shutter to close
@@ -189,6 +190,7 @@ class BaaderDome(FollowMixin, BaseDome):
                 self._abort_shutter.wait(1)
 
             # set new status
+            log.info('Dome closed.')
             self._change_motion_status(IMotion.Status.PARKED)
 
     def _move(self, az: float, abort: threading.Event):
