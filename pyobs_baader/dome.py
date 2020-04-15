@@ -29,7 +29,7 @@ class Command:
         self.response = response
         self.finished.set()
 
-    def wait(self, timeout: int = 10):
+    def wait(self, timeout: int = 10) -> str:
         """Wait for command to finish.
 
         Args:
@@ -44,6 +44,7 @@ class Command:
         self.finished.wait(timeout)
         if not self.finished.is_set():
             raise TimeoutError
+        return self.response
 
 
 class OpenCommand(Command):
