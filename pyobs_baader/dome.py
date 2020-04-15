@@ -56,11 +56,11 @@ class BaaderDome(FollowMixin, BaseDome):
         self._altitude = 0
         self._azimuth = 0
 
-        # start thread
-        self._add_thread_func(self._communication)
-
         # mixins
         FollowMixin.__init__(self, device=follow, interval=10, tolerance=tolerance, mode=IAltAz)
+
+        # start thread
+        self._add_thread_func(self._communication)
 
     @timeout(1200000)
     def init(self, *args, **kwargs):
