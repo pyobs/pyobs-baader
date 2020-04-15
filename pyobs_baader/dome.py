@@ -121,6 +121,9 @@ class BaaderDome(FollowMixin, BaseDome):
         self._add_thread_func(self._communication)
         self._add_thread_func(self._update_status)
 
+        # init status to IDLE
+        self._change_motion_status(IMotion.Status.IDLE)
+
         # mixins
         FollowMixin.__init__(self, device=follow, interval=10, tolerance=tolerance, mode=IAltAz)
 
