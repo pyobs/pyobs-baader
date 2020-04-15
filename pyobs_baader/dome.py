@@ -135,7 +135,7 @@ class BaaderDome(FollowMixin, BaseDome):
         # acquire lock
         with LockWithAbort(self._lock_shutter, self._abort_shutter):
             # log
-            log.info('Opening roof...')
+            log.info('Opening dome...')
             self._change_motion_status(IMotion.Status.INITIALIZING)
     
             # execute command
@@ -147,13 +147,14 @@ class BaaderDome(FollowMixin, BaseDome):
             while self._shutter != 'd#shutope':
                 # abort?
                 if self._abort_shutter.is_set():
-                    log.warning('Opening roof aborted.')
+                    log.warning('Opening dome aborted.')
                     return
                 
                 # wait a little
                 self._abort_shutter.wait(1)
                 
             # set new status
+            log.info('Dome opened.')
             self._change_motion_status(IMotion.Status.POSITIONED)
 
     @timeout(1200000)
@@ -167,7 +168,7 @@ class BaaderDome(FollowMixin, BaseDome):
         # acquire lock
         with LockWithAbort(self._lock_shutter, self._abort_shutter):
             # log
-            log.info('Closing roof...')
+            log.info('Closing dome...')
             self._change_motion_status(IMotion.Status.PARKING)
 
             # send command for closing shutter
@@ -183,7 +184,7 @@ class BaaderDome(FollowMixin, BaseDome):
             while self._shutter != 'd#shutclo':
                 # abort?
                 if self._abort_shutter.is_set():
-                    log.warning('Closing roof aborted.')
+                    log.warning('Closing dome aborted.')
                     return
 
                 # wait a little
