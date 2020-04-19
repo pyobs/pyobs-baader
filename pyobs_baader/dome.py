@@ -116,7 +116,6 @@ class BaaderDome(FollowMixin, BaseDome):
         self._shutter = None
         self._altitude = 0
         self._azimuth = 0
-        self._set_az = 0
 
         # start thread
         self._add_thread_func(self._communication)
@@ -206,11 +205,6 @@ class BaaderDome(FollowMixin, BaseDome):
             abort: Abort event.
         """
 
-        # log?
-        if az != self._set_az:
-            log.info('Moving dome to az=%.2f°.', az)
-        self._set_az = az
-
         # Baader measures azimuth as West of South, so we need to convert it
         azimuth = BaaderDome._adjust_azimuth(az)
 
@@ -220,11 +214,19 @@ class BaaderDome(FollowMixin, BaseDome):
             raise ValueError('Got invalid response from dome.')
 
         # wait for it
+        log_timer = 0
         while 180 - abs(abs(az - self._azimuth) - 180) > self._tolerance:
             # abort?
             if abort.is_set():
-                log.info('Abort moving to az=%.2f...', az)
                 return
+
+            # log?
+            if log_timer == 0:
+                log.info('Moving dome from current az=%.2f° to %.2f° (%.2f° left)...',
+                         self._azimuth, az, 180 - abs(abs(az - self._azimuth) - 180))
+            log_timer += 1
+            if log_timer == 10:
+                log_timer = 0
 
             # wait a little
             abort.wait(1)
