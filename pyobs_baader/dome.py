@@ -116,6 +116,7 @@ class BaaderDome(FollowMixin, BaseDome):
         self._shutter = None
         self._altitude = 0
         self._azimuth = 0
+        self._set_az = 0
 
         # start thread
         self._add_thread_func(self._communication)
@@ -205,11 +206,15 @@ class BaaderDome(FollowMixin, BaseDome):
             abort: Abort event.
         """
 
+        # log?
+        if az != self._set_az:
+            log.info('Moving dome to az=%.2f°.', az)
+        self._set_az = az
+
         # Baader measures azimuth as West of South, so we need to convert it
         azimuth = BaaderDome._adjust_azimuth(az)
 
         # execute command
-        log.info('Moving dome to az=%.2f°.', az)
         command = self._queue_command(SlewCommand(azimuth))
         if command.wait() != 'd#gotmess':
             raise ValueError('Got invalid response from dome.')
@@ -329,7 +334,9 @@ class BaaderDome(FollowMixin, BaseDome):
             # get shutter status, might be one of d#shutclo, d#shutrun, or d#shutope
             command = self._queue_command(GetShutCommand())
             self._shutter = command.wait()
-            if self._shutter == 'd#shutclo':
+
+            # if shutter is closed and current motion status is not INITIALIZING, set it to PARKET
+            if self._shutter == 'd#shutclo' and self.get_motion_status() != IMotion.Status.INITIALIZING:
                 self._change_motion_status(IMotion.Status.PARKED)
 
             # get azimuth
