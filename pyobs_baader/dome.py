@@ -116,6 +116,7 @@ class BaaderDome(FollowMixin, BaseDome):
         self._shutter = None
         self._altitude = 0
         self._azimuth = 0
+        self._set_az = 0
 
         # start thread
         self._add_thread_func(self._communication)
@@ -250,6 +251,11 @@ class BaaderDome(FollowMixin, BaseDome):
         if not self.is_ready():
             log.warning('Dome not ready, ignoring slew command.')
             return
+
+        # destination az already set?
+        if az == self._set_az:
+            return
+        self._set_az = az
 
         # is this a larger move?
         large_move = abs(az - self._azimuth) > 2. * self._tolerance
