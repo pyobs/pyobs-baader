@@ -76,7 +76,7 @@ class BaaderDome(FollowMixin, BaseDome):
     """A pyobs module for a Baader dome."""
 
     def __init__(self, port: str = '/dev/ttyUSB0', baud_rate: int = 9600, byte_size: int = 8, parity: str = 'N',
-                 stop_bits: int = 1, timeout: int = 180, tolerance: float = 2, park_az: float = 180, follow: str = None,
+                 stop_bits: int = 1, timeout: int = 180, tolerance: float = 3, park_az: float = 180, follow: str = None,
                  *args, **kwargs):
         """Initializes a new Baader dome.
         
