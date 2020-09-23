@@ -4,6 +4,7 @@ from queue import Queue
 import serial
 import logging
 
+from pyobs.events import RoofOpenedEvent, RoofClosingEvent
 from pyobs.modules import timeout
 from pyobs.utils.threads import LockWithAbort
 
@@ -160,6 +161,7 @@ class BaaderDome(FollowMixin, BaseDome):
             # set new status
             log.info('Dome opened.')
             self._change_motion_status(IMotion.Status.POSITIONED)
+            self.comm.send_event(RoofOpenedEvent())
 
     @timeout(1200000)
     def park(self, *args, **kwargs):
@@ -174,6 +176,7 @@ class BaaderDome(FollowMixin, BaseDome):
             # log
             log.info('Closing dome...')
             self._change_motion_status(IMotion.Status.PARKING)
+            self.comm.send_event(RoofClosingEvent())
 
             # send command for closing shutter
             command = self._queue_command(CloseCommand())
