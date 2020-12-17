@@ -1,6 +1,8 @@
 import math
 import threading
 from queue import Queue
+from typing import Tuple
+
 import serial
 import logging
 
@@ -284,7 +286,7 @@ class BaaderDome(FollowMixin, BaseDome):
             # change status to TRACKING or POSITIONED, depending on whether we're tracking
             self._change_motion_status(IMotion.Status.TRACKING if self.is_following else IMotion.Status.POSITIONED)
 
-    def get_altaz(self, *args, **kwargs) -> (float, float):
+    def get_altaz(self, *args, **kwargs) -> Tuple[float, float]:
         """Returns current Alt and Az.
 
         Returns:
